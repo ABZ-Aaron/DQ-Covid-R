@@ -1,0 +1,155 @@
+---
+title: "Investigating Covid-19 Trends"
+author: "Aaron Wright"
+date: "06/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tibble)
+library(dplyr)
+```
+
+## Summary
+
+This is a very basic project, where I'll be using some basic `R` techniques to investigate Covid-19 Trends.
+
+Specifically, we want to identify what countries have had the **highest number of positive cases** against the **number of tests**.
+
+```{r}
+# Reading in the data. The second argument prevents any output from appearing.
+covid_df <- read_csv("covid19.csv", col_types = cols())
+```
+
+```{r}
+# Displaying the dimensions of the data.
+dim(covid_df)
+```
+```{r}
+# Display all the column names.
+vector_cols <- colnames(covid_df)
+vector_cols
+```
+```{r}
+# Display the first few records of the data frame.
+head(covid_df, 3)
+# Display the last few records of the data frame.
+tail(covid_df, 3)
+```
+```{r}
+# Take a glimpse at the dataset
+glimpse(covid_df)
+```
+Here we can see that we have various data types: `double`, `character` and `date`. The `glimpse` function also shows us the total number of rows and columns. This is useful for us to get an overview of our data, and can essentially replace the other functions we've used such as `head`, `colnames` and `dim`.
+
+We can see that the `Province_State` column in our data has `All States` as a value, alongside other values such as `Washington`. Ultimately, we want to only keep rows with `All States` (country level) as to not bias our analysis. Let's filter the data by this.
+
+```{r}
+# Here we are filtering by All States and then removing the Province_State column
+covid_df_all_states <- covid_df %>%
+                       filter(Province_State == "All States") %>%
+                       select(-Province_State)
+```
+
+The above code uses `piping` which uses the `%>%` syntax. We are essentially `piping` our data frame into the `filter` function where we filter by `All States`. We then `pipe` this new data frame into the `select` function, which in this case, removes the `Province_State` column. We no longer require this column, as we know every value will be equal to `All States`
+
+It turns out, some of the columns in the data set provide cumulative information, whereas others provide daily information. We don't really want to be comparing cumulative stats with daily stats. Therefore lets only look at the daily information for now.
+
+```{r}
+# Only keeping columns that deal with daily data.
+covid_df_all_states_daily <- select(covid_df_all_states, Date, Country_Region, active, hospitalizedCurr, daily_tested, daily_positive)
+```
+
+```{r}
+colnames(covid_df_all_states_daily)
+```
+
+Now, let's group by the `Country_Region` column, and compute the sum of the remaining columns.
+
+```{r}
+covid_df_all_states_daily_sum <- covid_df_all_states_daily %>%
+                                 group_by(Country_Region) %>%
+                                 summarise(tested = sum(daily_tested),
+                                           positive = sum(daily_positive),
+                                           active = sum(active),
+                                           hospitalized = sum(hospitalizedCurr)) %>% 
+                                 arrange(-tested)
+
+covid_top_10 <- head(covid_df_all_states_daily_sum, 10)
+covid_top_10
+                                  
+```
+Let's create some vectors from each column for our next exercise.
+
+```{r}
+countries <- covid_top_10$Country_Region
+tested_cases <- covid_top_10$tested
+positive_cases <- covid_top_10$positive
+ative_cases <- covid_top_10$active
+hospitalized_cases <- covid_top_10$hospitalized
+```
+
+Let's now name those vectors with the `countries` vector.
+
+```{r}
+names(tested_cases) <- countries
+names(positive_cases) <- countries
+names(ative_cases) <- countries
+names(hospitalized_cases) <- countries
+```
+
+Let's now find the top three positive against tested cases. We'll want to find the **ratio** here.
+
+```{r}
+# Finding the ratio
+positive_cases / tested_cases
+```
+
+We can see that the top 3 highest ratios are for `United Kingdom`, `United states`, and `Turkey`. Let's assign this to a variable.
+
+```{r}
+positive_tested_top_3 <- c("United Kingdom" = .113, "United States" = .109, "Turkey" = .080)
+positive_tested_top_3
+```
+
+Let's create a matrix with the above information. We'll just manually add the extra information for now.
+
+```{r}
+united_kingdom <- c(0.11, 1473672, 166909, 0, 0)
+united_states <- c(0.10, 17282363, 1877179, 0, 0)
+turkey <- c(0.08, 2031192, 163941, 2980960, 0)
+
+covid_mat <- rbind(united_kingdom, united_states, turkey)
+colnames(covid_mat) <- c("Ratio", "tested", "positive", "active", "hospitalized")
+
+covid_mat
+```
+
+We'll now play around with the `list` data structure. Here we can store all our project data in a single object.
+
+```{r}
+
+# Create question/answer for which country had the highest number of positive cases against the number of tests.
+question <- "Which countries have had the highest number of positive cases against the number of tests?"
+answer <- c("Positive tested cases" = positive_tested_top_3)
+
+# Create separate lists for each data structure type.
+dataframes <- list(covid_df, covid_df_all_states, covid_df_all_states_daily, covid_top_10)
+matrices <- list(covid_mat)
+vectors <- list(vector_cols, countries)
+
+# Add all data structure lists into one list and name them.
+data_structure_list <- list(dataframes = dataframes,
+                            matrices = matrices,
+                            vectors = vectors)
+
+# Add data structure list, along with question and answer objects to a new list.
+covid_analysis_list <- list(question, 
+                            answer, 
+                            data_structure_list)
+
+# Print off the answer to our question.
+covid_analysis_list[[2]]
+```
